@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --ink: #182421;
+  --canvas: #f3f5f0;
+  --line: #e2e7e0;
+  --muted: #78827c;
+  --fern: #30594b;
+  --lime: #c7ef62;
+  --coral: #e36d52;
+}
+
+* { box-sizing: border-box; }
+html { min-height: 100%; background: var(--canvas); font-size: 17px; }
+body { margin: 0; color: var(--ink); font-family: 'Avenir Next', 'Segoe UI Variable', sans-serif; font-feature-settings: 'ss01' on; }
+button, input, select { font: inherit; }
+button { cursor: pointer; }
+::selection { color: var(--ink); background: var(--lime); }
+
+.app-shell { min-height: 100vh; }
+.sidebar { width: 252px; background: #182421; color: #f4f6ef; }
+.nav-link { display: flex; align-items: center; gap: 12px; border-radius: 8px; padding: 10px 12px; color: #aeb9b1; font-size: 14px; transition: background .18s, color .18s; }
+.nav-link:hover { background: #26332e; color: white; }
+.nav-link.active { background: #c7ef62; color: #182421; font-weight: 650; }
+.panel { border: 1px solid var(--line); border-radius: 8px; background: white; }
+.eyebrow { color: #7a8580; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.metric-value { font-family: Georgia, serif; font-size: 36px; letter-spacing: 0; line-height: 1; }
+.data-row { display: grid; align-items: center; border-bottom: 1px solid #edf0eb; }
+.data-row:last-child { border-bottom: 0; }
+.status-pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 9px; font-size: 12px; font-weight: 650; white-space: nowrap; }
+.mobile-overlay { background: rgb(16 26 23 / 48%); }
+[class~="text-[10px]"] { font-size: 12px; }
+[class~="text-[11px]"] { font-size: 13px; }
+
+@media (max-width: 767px) {
+  .sidebar { position: fixed; z-index: 50; inset: 0 auto 0 0; transform: translateX(-100%); transition: transform .22s ease; }
+  .sidebar.open { transform: translateX(0); }
+}
+
+@media print {
+  @page { margin: 0; }
+  body * { visibility: hidden !important; }
+  .inventory-label-print,
+  .inventory-label-print *,
+  .batch-label-print,
+  .batch-label-print * { visibility: visible !important; }
+  .inventory-label-print {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 68mm !important;
+    max-width: 68mm !important;
+    margin: auto !important;
+    padding: 5mm !important;
+    box-shadow: none !important;
+  }
+  .batch-label-print {
+    position: static !important;
+    display: block !important;
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: white !important;
+    box-shadow: none !important;
+  }
+  .batch-label-preview {
+    display: block !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+  .batch-label {
+    break-after: page;
+    page-break-after: always;
+    transform: none !important;
+    margin: 0 !important;
+    border: 0.1mm solid #ddd;
+  }
+  .batch-label:last-child { break-after: auto; page-break-after: auto; }
+  .no-print { display: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
