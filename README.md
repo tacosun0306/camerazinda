@@ -18,13 +18,15 @@ npm run dev
 
 Production 環境變數請在 Vercel Project Settings 設定上述兩個公開變數，並確認只含 Supabase publishable/anon key；不要提交 `.env.local` 或設定 service role key、資料庫密碼、JWT secret。
 
-商品 SKU 由 Supabase `create_inventory_item` RPC 使用資料庫 sequence 產生；「相機」對應 `CAM`、「鏡頭」對應 `LEN`，其他分類對應 `ACC`。舊 SKU 不會重編，SKU 建立後不可修改。商品 QR 使用固定商品 UUID，掃描時由資料庫載入最新資料；重印標籤不會建立新商品或 SKU。
+商品 SKU 由 Supabase `create_inventory_item` RPC 使用資料庫 sequence 產生；「相機」、「攝影機」、「拍立得」對應 `CAM`，「鏡頭」對應 `LEN`，其他分類對應 `ACC`。舊 SKU 不會重編，SKU 建立後不可修改。
 
 SKU 產生 migration 為 `supabase/migrations/202610130003_generate_inventory_sku_by_category.sql`。在 Supabase Dashboard 的 SQL Editor 依序套用 migration 目錄內尚未執行的檔案，再部署應用程式。
 
 商品標籤批次列印頁位於 `/inventory/labels`。型號／啟用狀態欄位及標籤搜尋 RPC 的 migration 為 `202610130004_inventory_model_and_active_status.sql` 和 `202610130005_search_inventory_label_items.sql`；請在 SKU migration 後依序套用。列印頁以資料庫分頁搜尋啟用商品，QR 沿用商品 UUID，不建立或修改商品識別資訊。
 
 實體商品主檔／單位相容 migration 為 `supabase/migrations/202610130006_product_units_and_unit_operations.sql`。在 Supabase SQL Editor 套用前，請確認 `inventory_items.quantity` 等於各 `inventory_stocks.quantity` 加總；migration 會自動檢查，不一致時回滾。套用後，`product_units` 是唯一實體庫存來源，舊商品主檔與分店數量欄位由資料庫同步維持相容。
+
+品牌及新增商品流程 migration 為 `supabase/migrations/202610150001_inventory_brand.sql`。它新增可為空的 `inventory_items.brand`，並提供品牌版新增／編輯 RPC；套用後再部署應用程式，既有 SKU、UUID、庫存與歷史異動不會重建。此 migration 已於 2026-10-15 套用至 Production；本次前端變更仍在 `feature/inventory-product-creation`，尚未部署。
 
 ## 範圍
 
