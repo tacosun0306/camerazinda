@@ -102,7 +102,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
         <div className="mt-auto rounded-lg border border-[#34413b] bg-[#202c27] p-3.5">
           <div className="flex items-center justify-between"><span className="eyebrow text-[#9ca9a1]">門市狀態</span><span className="h-2 w-2 rounded-full bg-lime" /></div>
-          <p className="mt-2 text-sm font-semibold">台北旗艦店</p>
+          <p className="mt-2 text-sm font-semibold">台南晶大門市</p>
           <p className="mt-1 text-xs text-[#9ca9a1]">營業中 · 10:00 – 22:00</p>
         </div>
       </aside>
