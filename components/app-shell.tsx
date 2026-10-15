@@ -93,7 +93,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <p className="eyebrow px-3 pb-2 text-[#75827a]">工作台</p>
         <nav className="space-y-1" aria-label="主要導覽">
-          {modules.filter(({ href }) => !['/users', '/roles', '/audit-logs'].includes(href) || profile?.role === 'admin' || profile?.role === 'manager').map(({ href, label, icon: Icon }) => (
+          {modules.filter(({ href }) => {
+            if (href === '/users') return profile?.role === 'admin';
+            if (['/roles', '/audit-logs'].includes(href)) return profile?.role === 'admin' || profile?.role === 'manager';
+            return true;
+          }).map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} onClick={() => setMenuOpen(false)} className={`nav-link ${pathname === href ? 'active' : ''}`}>
               <Icon size={17} strokeWidth={1.8} /><span>{label}</span>
               {href === '/repairs' && repairCount !== null && repairCount > 0 && <span className="ml-auto rounded-full bg-[#e36d52] px-1.5 py-0.5 text-[10px] font-bold text-white">{repairCount}</span>}

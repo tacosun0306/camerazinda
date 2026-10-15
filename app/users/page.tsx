@@ -1,4 +1,4 @@
 import { AppShell } from '@/components/app-shell';
-import { WorkspacePage } from '@/components/workspace-page';
+import { EmployeeManagement } from '@/components/employee-management';
 
-export default function UsersPage() { return <AppShell><WorkspacePage moduleKey="users" /></AppShell>; }
+export default function UsersPage() { return <AppShell><EmployeeManagement /></AppShell>; }

@@ -10,13 +10,6 @@ import { addAuditLog, clockIn, clockOut, createWorkspaceRecord, loadWorkspaceRec
 import { moduleContent, repairStatuses, type WorkspaceField, type WorkspaceKey } from '@/lib/modules';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
-const roleOptions = [
-  { value: 'admin', label: '系統管理員' },
-  { value: 'manager', label: '店長' },
-  { value: 'sales', label: '門市人員' },
-  { value: 'technician', label: '維修技師' },
-] as const;
-
 const statusTone = (value: string) => {
   if (/已售完|未打卡|遲到|停用|低/.test(value)) return 'bg-[#fae8e2] text-[#bd5039]';
   if (/待|維修中/.test(value)) return 'bg-[#f5eed9] text-[#816925]';
@@ -124,42 +117,6 @@ export function WorkspacePage({ moduleKey }: { moduleKey: WorkspaceKey }) {
     }
   }
 
-  async function saveUserRole(record: WorkspaceRecord) {
-    if (!profile?.id) return;
-    setSavingId(record.id);
-    try {
-      const supabase = createSupabaseBrowserClient();
-      const role = pendingValues[record.id] ?? record.editableValue ?? 'sales';
-      const { error: updateError } = await supabase.from('profiles').update({ role }).eq('id', record.id);
-      if (updateError) throw updateError;
-      await addAuditLog(supabase, profile.id, 'employee_role_updated', 'profile', record.id, { role });
-      await refresh();
-      setNotice('員工角色已更新');
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : '更新失敗，請確認管理員權限');
-    } finally {
-      setSavingId('');
-    }
-  }
-
-  async function toggleUserActive(record: WorkspaceRecord) {
-    if (!profile?.id) return;
-    setSavingId(record.id);
-    try {
-      const supabase = createSupabaseBrowserClient();
-      const active = record.data?.active !== true;
-      const { error: updateError } = await supabase.from('profiles').update({ active }).eq('id', record.id);
-      if (updateError) throw updateError;
-      await addAuditLog(supabase, profile.id, active ? 'employee_activated' : 'employee_deactivated', 'profile', record.id);
-      await refresh();
-      setNotice(active ? '員工帳號已啟用' : '員工帳號已停用');
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : '更新失敗，請確認管理員權限');
-    } finally {
-      setSavingId('');
-    }
-  }
-
   async function handleClock(action: 'in' | 'out') {
     if (!profile?.id) return;
     setAttendanceBusy(true);
@@ -179,9 +136,8 @@ export function WorkspacePage({ moduleKey }: { moduleKey: WorkspaceKey }) {
 
   const canEditInventory = profile && ['admin', 'manager', 'sales'].includes(profile.role);
   const canUpdateRepair = profile && ['admin', 'manager', 'technician'].includes(profile.role);
-  const isAdmin = profile?.role === 'admin';
   const ownAttendance = records.find((record) => record.data?.employee_id === profile?.id && record.data?.punch_id && !record.data?.clocked_out_at);
-  const canShowActions = (moduleKey === 'inventory' && canEditInventory) || (moduleKey === 'repairs' && canUpdateRepair) || (moduleKey === 'users' && isAdmin);
+  const canShowActions = (moduleKey === 'inventory' && canEditInventory) || (moduleKey === 'repairs' && canUpdateRepair);
 
   return (
     <div className="space-y-6">
@@ -201,7 +157,6 @@ export function WorkspacePage({ moduleKey }: { moduleKey: WorkspaceKey }) {
           {!loading && filteredRecords.map((record) => <div key={record.id} className="data-row min-h-[58px] gap-3 px-5 py-3 text-xs" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr)) ${canShowActions ? '150px' : ''}` }}>{record.cells.map((cell, cellIndex) => <span key={`${cell}-${cellIndex}`} className="truncate" title={cell}>{cellIndex === record.cells.length - 1 ? <span className={`status-pill ${statusTone(cell)}`}>{cell}</span> : <span className={cellIndex === 0 ? 'font-semibold text-ink' : 'text-[#65716b]'}>{cell}</span>}</span>)}
             {moduleKey === 'inventory' && canEditInventory && <span className="flex items-center gap-2"><button onClick={() => openEdit(record)} className="text-xs font-semibold text-fern hover:underline">編輯品項</button></span>}
             {moduleKey === 'repairs' && canUpdateRepair && <span className="flex items-center gap-1"><select aria-label={`${record.cells[0]}維修狀態`} value={pendingValues[record.id] ?? record.editableValue} onChange={(event) => setPendingValues((current) => ({ ...current, [record.id]: event.target.value }))} className="h-8 min-w-0 rounded border-[#dfe5de] bg-white text-xs">{repairStatuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select><button disabled={savingId === record.id || (pendingValues[record.id] ?? record.editableValue) === record.editableValue} onClick={() => void saveRepairStatus(record)} className="text-xs font-semibold text-fern disabled:opacity-40">儲存</button></span>}
-            {moduleKey === 'users' && isAdmin && <span className="flex items-center gap-1"><select aria-label={`${record.cells[0]}員工角色`} value={pendingValues[record.id] ?? record.editableValue} onChange={(event) => setPendingValues((current) => ({ ...current, [record.id]: event.target.value }))} className="h-8 min-w-0 rounded border-[#dfe5de] bg-white text-xs">{roleOptions.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select><button disabled={savingId === record.id || (pendingValues[record.id] ?? record.editableValue) === record.editableValue} onClick={() => void saveUserRole(record)} className="text-xs font-semibold text-fern disabled:opacity-40">儲存</button><button disabled={savingId === record.id || record.id === profile?.id} onClick={() => void toggleUserActive(record)} className="text-xs font-semibold text-[#bd5039] disabled:opacity-40">{record.data?.active === true ? '停用' : '啟用'}</button></span>}
           </div>)}
           {!loading && !error && filteredRecords.length === 0 && <div className="px-5 py-14 text-center text-sm text-[#87918a]">目前沒有資料</div>}
           </div></div>

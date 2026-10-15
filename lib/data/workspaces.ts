@@ -170,11 +170,6 @@ export async function updateWorkspaceRecord(client: SupabaseClient, moduleKey: W
     fail(error);
     return;
   }
-  if (moduleKey === 'users') {
-    const { error } = await client.from('profiles').update({ role: values.role, active: values.active === 'true' }).eq('id', recordId);
-    fail(error);
-    return;
-  }
   throw new Error('此模組不支援更新資料');
 }
 

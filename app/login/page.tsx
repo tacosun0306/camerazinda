@@ -7,6 +7,9 @@ const errors: Record<string, string> = {
   credentials: '帳號或密碼錯誤，請再試一次。',
   configuration: '尚未設定 Supabase，請依 README 完成環境設定。',
   profile: '此帳號尚未啟用員工資料，請聯絡系統管理員。',
+  first_setup: '帳號尚待首次設定密碼，請使用管理員寄送的郵件連結。',
+  password_reset: '此帳號待重新設定密碼，請使用最新的重設郵件連結。',
+  password_updated: '密碼設定完成，請使用新密碼登入。',
 };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; next?: string }> }) {

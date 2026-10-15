@@ -19,8 +19,19 @@ export async function signIn(formData: FormData) {
   } catch {
     redirect('/login?error=configuration');
   }
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) redirect('/login?error=credentials');
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('active, account_status')
+    .eq('id', data.user.id)
+    .maybeSingle();
+  if (profileError || !profile?.active || profile.account_status !== 'active') {
+    await supabase.auth.signOut({ scope: 'local' });
+    if (profile?.account_status === 'pending_password_setup') redirect('/login?error=first_setup');
+    if (profile?.account_status === 'password_reset_pending') redirect('/login?error=password_reset');
+    redirect('/login?error=profile');
+  }
   const next = formData.get('next');
   if (typeof next === 'string' && next.startsWith('/inventory') && !next.startsWith('//') && !next.includes('\\')) {
     redirect(next);
