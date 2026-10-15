@@ -28,6 +28,7 @@ type UnitOption = { id: string; unit_code: string; store_id: string; store_name:
 type InventoryItem = {
   id: string;
   name: string;
+  brand: string | null;
   model: string | null;
   sku: string;
   barcode: string | null;
@@ -57,6 +58,7 @@ type InventoryMovement = {
 };
 type ProductForm = {
   name: string;
+  brand: string;
   model: string;
   barcode: string;
   serial_number: string;
@@ -68,7 +70,7 @@ type ProductForm = {
 type DialogMode = 'actions' | 'create' | 'edit' | 'unit' | 'unit-operation' | 'receive' | 'sale' | 'transfer' | 'store' | null;
 
 const emptyProduct: ProductForm = {
-  name: '', model: '', barcode: '', serial_number: '', category: '',
+  name: '', brand: '', model: '', barcode: '', serial_number: '', category: '',
   reorder_threshold: '1', initial_quantity: '0', store_id: '',
 };
 
@@ -82,7 +84,22 @@ const inventoryCategories = [
   { value: '拍立得', label: '拍立得' },
   { value: '記憶卡', label: '記憶卡' },
   { value: '原廠電池', label: '原廠電池' },
+  { value: '配件', label: '配件' },
 ];
+const commonInventoryBrands = [
+  'Canon', 'Fujifilm', 'Hasselblad', 'Kingston', 'Leica', 'Lexar', 'Nikon', 'Olympus',
+  'OM System', 'Panasonic', 'Pentax', 'Polaroid', 'ProGrade Digital', 'Ricoh', 'Samsung',
+  'SanDisk', 'Sigma', 'Sony', 'Tamron', 'Tokina', 'Zeiss',
+];
+const categoryHints: Record<string, { brands: string; name: string; model: string; details: string }> = {
+  相機: { brands: 'Canon、Nikon、Sony、Fujifilm', name: '例如：A7 IV', model: '例如：ILCE-7M4', details: '可在型號或備註中補充感光元件規格、相機系列。' },
+  鏡頭: { brands: 'Canon、Sony、Sigma、Tamron', name: '例如：FE 24-70mm F2.8 GM II', model: '填寫完整鏡頭型號', details: '可補充焦段、光圈及接環規格。' },
+  攝影機: { brands: 'Sony、Canon、Panasonic', name: '例如：FX3', model: '填寫攝影機型號', details: '可補充錄影規格或產品系列。' },
+  拍立得: { brands: 'Fujifilm、Polaroid', name: '例如：instax mini 12', model: '填寫產品型號', details: '可補充底片規格或產品系列。' },
+  記憶卡: { brands: 'SanDisk、Lexar、Kingston', name: '例如：Extreme PRO SDXC', model: '填寫產品型號', details: '可補充容量、速度等級及卡片規格。' },
+  原廠電池: { brands: 'Sony、Canon、Nikon', name: '例如：NP-FZ100', model: '填寫電池型號', details: '可補充適用機型。' },
+  配件: { brands: '可輸入品牌；無品牌可留空', name: '例如：相機背帶、鏡頭保護鏡、熱靴蓋', model: '依商品實際情況填寫', details: '通用配件可用商品名稱描述用途、規格或相容機型。' },
+};
 const movementLabels: Record<InventoryMovement['action'], string> = {
   created: '新增主檔', updated: '編輯商品', received: '入庫實體商品', sale: '出售實體商品', transfer: '調撥實體商品', disabled: '停用實體商品',
 };
@@ -127,6 +144,10 @@ export function InventoryManagement() {
   const [receiveStoreId, setReceiveStoreId] = useState('');
   const [receiveQuantity, setReceiveQuantity] = useState('1');
   const [productForm, setProductForm] = useState<ProductForm>(emptyProduct);
+  const [brandMenuOpen, setBrandMenuOpen] = useState(false);
+  const [createStep, setCreateStep] = useState<1 | 2>(1);
+  const [productFormError, setProductFormError] = useState('');
+  const [productFormNotice, setProductFormNotice] = useState('');
   const [saleStoreId, setSaleStoreId] = useState('');
   const [saleQuantity, setSaleQuantity] = useState('1');
   const [saleNote, setSaleNote] = useState('');
@@ -152,7 +173,7 @@ export function InventoryManagement() {
     try {
       const client = createSupabaseBrowserClient();
       const [itemsResult, stocksResult, storesResult] = await Promise.all([
-        client.from('inventory_items').select('id, name, model, active, sku, barcode, serial_number, category, quantity, reorder_threshold').order('name'),
+        client.from('inventory_items').select('id, name, brand, model, active, sku, barcode, serial_number, category, quantity, reorder_threshold').order('name'),
         client.from('inventory_stocks').select('item_id, store_id, quantity'),
         client.from('store_locations').select('id, name').eq('active', true).order('name'),
       ]);
@@ -238,7 +259,7 @@ export function InventoryManagement() {
     const client = createSupabaseBrowserClient();
     const { data: item, error: itemError } = await client
       .from('inventory_items')
-      .select('id, name, model, active, sku, barcode, serial_number, category, quantity, reorder_threshold')
+      .select('id, name, brand, model, active, sku, barcode, serial_number, category, quantity, reorder_threshold')
       .eq('id', itemId)
       .single();
     if (itemError) throw itemError;
@@ -315,6 +336,9 @@ export function InventoryManagement() {
       return;
     }
     setProductForm({ ...emptyProduct, barcode: code, store_id: stores[0]?.id ?? '' });
+    setCreateStep(1);
+    setProductFormError('');
+    setProductFormNotice('');
     setSelectedItem(null);
     setDialog('create');
   }
@@ -366,17 +390,30 @@ export function InventoryManagement() {
   const filteredItems = useMemo(() => {
     const search = query.trim().toLocaleLowerCase();
     if (!search) return items;
-    return items.filter((item) => [item.name, item.sku, item.barcode, item.serial_number, item.category]
+    return items.filter((item) => [item.name, item.brand, item.sku, item.barcode, item.serial_number, item.category]
       .some((value) => value?.toLocaleLowerCase().includes(search)));
   }, [items, query]);
+  const brandSuggestions = useMemo(() => [...new Set(items.map((item) => item.brand?.trim()).filter((brand): brand is string => Boolean(brand)))].sort((left, right) => left.localeCompare(right, 'zh-TW')), [items]);
+  const brandOptions = useMemo(() => [...new Set([...commonInventoryBrands, ...brandSuggestions])].sort((left, right) => left.localeCompare(right, 'zh-TW')), [brandSuggestions]);
+  const filteredBrandOptions = useMemo(() => {
+    const search = productForm.brand.trim().toLocaleLowerCase();
+    return brandOptions.filter((brand) => !search || brand.toLocaleLowerCase().includes(search)).slice(0, 12);
+  }, [brandOptions, productForm.brand]);
+  const possibleDuplicates = dialog === 'create' && productForm.name.trim()
+    ? items.filter((item) => item.name.trim().toLocaleLowerCase() === productForm.name.trim().toLocaleLowerCase()
+      || Boolean(productForm.model.trim()) && (item.model ?? '').trim().toLocaleLowerCase() === productForm.model.trim().toLocaleLowerCase())
+    : [];
   const totalUnits = items.reduce((sum, item) => sum + item.quantity, 0);
   const lowStockItems = items.filter((item) => item.quantity <= item.reorder_threshold).length;
   const canManage = profile && ['admin', 'manager', 'sales'].includes(profile.role);
 
   function openEdit(item: InventoryItem) {
     setSelectedItem(item);
+    setProductFormError('');
+    setProductFormNotice('');
     setProductForm({
       name: item.name,
+      brand: item.brand ?? '',
       model: item.model ?? '',
       barcode: item.barcode ?? '',
       serial_number: item.serial_number ?? '',
@@ -391,14 +428,19 @@ export function InventoryManagement() {
   async function saveProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canManage) return;
+    setProductFormError('');
+    setProductFormNotice('');
     setSaving(true);
     setError('');
     try {
       const client = createSupabaseBrowserClient();
+      const submitter = (event.nativeEvent as SubmitEvent).submitter;
+      const continueAdding = dialog === 'create' && submitter instanceof HTMLButtonElement && submitter.value === 'continue';
       if (dialog === 'edit' && selectedItem) {
-        const { error: updateError } = await client.rpc('update_inventory_item_details_with_model', {
+        const { error: updateError } = await client.rpc('update_inventory_item_details_with_brand', {
           p_item_id: selectedItem.id,
           p_name: productForm.name,
+          p_brand: productForm.brand || null,
           p_barcode: productForm.barcode || null,
           p_serial_number: productForm.serial_number || null,
           p_category: productForm.category,
@@ -408,8 +450,9 @@ export function InventoryManagement() {
         if (updateError) throw updateError;
         setNotice('商品資料已更新');
       } else {
-        const { data, error: createError } = await client.rpc('create_inventory_item_with_model', {
+        const { data, error: createError } = await client.rpc('create_inventory_item_with_brand', {
           p_name: productForm.name.trim(),
+          p_brand: productForm.brand || null,
           p_barcode: productForm.barcode || null,
           p_serial_number: productForm.serial_number || null,
           p_category: productForm.category,
@@ -420,13 +463,27 @@ export function InventoryManagement() {
         });
         if (createError) throw createError;
         const createdUnitCount = Array.isArray(data.units) ? data.units.length : 0;
+        if (continueAdding) {
+          setProductFormNotice(`已新增「${productForm.name.trim()}」，SKU：${data.sku}。可繼續新增下一個品項。`);
+          setProductForm((current) => ({
+            ...emptyProduct,
+            category: current.category,
+            brand: current.brand,
+            reorder_threshold: current.reorder_threshold,
+            store_id: current.store_id,
+          }));
+          await refresh();
+          await loadMovements();
+          return;
+        }
         setNotice(`商品已新增，SKU：${data.sku}，建立 ${createdUnitCount} 件實體商品；可至批次標籤列印。`);
       }
       setDialog(null);
       await refresh();
       await loadMovements();
     } catch (saveError) {
-      setError(getSaveErrorMessage(saveError));
+      if (dialog === 'create') setProductFormError(getSaveErrorMessage(saveError));
+      else setError(getSaveErrorMessage(saveError));
     } finally {
       setSaving(false);
     }
@@ -624,7 +681,7 @@ export function InventoryManagement() {
     return item.stocks.find((stock) => stock.storeId === storeId)?.quantity ?? 0;
   }
 
-  const closeDialog = () => { setDialog(null); setSelectedItem(null); setSelectedUnit(null); setSelectedUnitIds([]); };
+  const closeDialog = () => { setDialog(null); setSelectedItem(null); setSelectedUnit(null); setSelectedUnitIds([]); setProductFormError(''); setProductFormNotice(''); };
 
   return (
     <div className="space-y-6">
@@ -638,7 +695,7 @@ export function InventoryManagement() {
           <Link href="/inventory/labels" className="inline-flex h-10 items-center gap-2 rounded-md border border-[#dce2db] bg-white px-3 text-xs font-semibold hover:border-ink"><Printer size={15} />標籤列印</Link>
           {['admin', 'manager'].includes(profile?.role ?? '') && <button onClick={() => { setStoreName(''); setDialog('store'); }} className="inline-flex h-10 items-center gap-2 rounded-md border border-[#dce2db] bg-white px-3 text-xs font-semibold hover:border-ink"><Store size={15} />新增分店</button>}
           <button onClick={() => { setScannerError(''); setScannerOpen(true); }} className="inline-flex h-10 items-center gap-2 rounded-md border border-[#dce2db] bg-white px-3 text-xs font-semibold hover:border-ink"><Camera size={15} />掃描 QR</button>
-          <button onClick={() => { setSelectedItem(null); setProductForm({ ...emptyProduct, store_id: stores[0]?.id ?? '' }); setDialog('create'); }} className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-3.5 text-xs font-semibold text-white hover:bg-fern"><PackagePlus size={15} />新增商品</button>
+          <button onClick={() => { setSelectedItem(null); setProductForm({ ...emptyProduct, store_id: stores[0]?.id ?? '' }); setCreateStep(1); setProductFormError(''); setProductFormNotice(''); setDialog('create'); }} className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-3.5 text-xs font-semibold text-white hover:bg-fern"><PackagePlus size={15} />新增商品</button>
           <button onClick={() => void refresh()} aria-label="重新載入庫存" className="grid h-10 w-10 place-items-center rounded-md border border-[#dce2db] bg-white hover:border-ink"><RefreshCw size={15} /></button>
         </div>
       </section>
@@ -669,7 +726,7 @@ export function InventoryManagement() {
             <div className="data-row grid grid-cols-[1.5fr_1fr_1.2fr_90px_235px] gap-3 bg-[#fafbf9] px-5 py-3 text-[10px] font-semibold text-[#87918a]"><span>商品</span><span>SKU / QR 碼</span><span>分店庫存</span><span>總數</span><span>操作</span></div>
             {loading && <div className="px-5 py-12 text-center text-sm text-[#87918a]">正在從 Supabase 載入…</div>}
             {!loading && filteredItems.map((item) => <div key={item.id} className="data-row grid min-h-[70px] grid-cols-[1.5fr_1fr_1.2fr_90px_235px] gap-3 px-5 py-3 text-xs">
-              <span className="min-w-0"><span className="block truncate font-semibold text-ink">{item.name}</span><span className="mt-1 block truncate text-[11px] text-[#87918a]">{item.model || '型號未設定'} · {item.category}{item.serial_number ? ` · ${item.serial_number}` : ''}</span></span>
+              <span className="min-w-0"><span className="block truncate font-semibold text-ink">{item.name}</span><span className="mt-1 block truncate text-[11px] text-[#87918a]">{item.brand ? `${item.brand} · ` : ''}{item.model || '型號未設定'} · {item.category}{item.serial_number ? ` · ${item.serial_number}` : ''}</span></span>
               <span className="min-w-0"><span className="block truncate text-[#526159]">{item.sku}</span><span className="mt-1 block truncate text-[11px] text-[#87918a]">{item.barcode || '未設定 QR / 條碼'}</span></span>
               <span className="flex flex-wrap gap-1.5">{item.stocks.map((stock) => <span key={stock.storeId} className="rounded bg-[#f3f5f0] px-2 py-1 text-[11px] text-[#526159]">{stock.storeName} {stock.quantity}</span>)}{item.stocks.length === 0 && <span className="text-[#87918a]">尚未分配分店</span>}</span>
               <span><span className={`status-pill ${item.quantity === 0 ? 'bg-[#fae8e2] text-[#bd5039]' : item.quantity <= item.reorder_threshold ? 'bg-[#f5eed9] text-[#816925]' : 'bg-[#e6efe8] text-fern'}`}>{item.quantity}</span></span>
@@ -727,16 +784,22 @@ export function InventoryManagement() {
         {dialog === 'unit' && selectedUnit && <section role="dialog" aria-modal="true" aria-labelledby="physical-unit-title" className="my-auto w-full max-w-md rounded-lg bg-white p-5 shadow-xl"><div className="mb-5 flex items-start justify-between"><div><p className="eyebrow">PHYSICAL UNIT</p><h2 id="physical-unit-title" className="mt-1 text-lg font-semibold">{selectedUnit.product_name}</h2><p className="mt-1 text-xs text-[#78827c]">SKU {selectedUnit.sku} · {selectedUnit.model || '型號未設定'}</p></div><button onClick={closeDialog} aria-label="關閉" className="grid h-8 w-8 place-items-center rounded-md hover:bg-canvas"><X size={17} /></button></div><dl className="grid grid-cols-[100px_1fr] gap-y-2 border-y border-[#edf0eb] py-4 text-xs"><dt className="text-[#78827c]">內部序號</dt><dd className="font-mono font-semibold">{selectedUnit.unit_code}</dd><dt className="text-[#78827c]">目前分店</dt><dd>{selectedUnit.store_name}</dd><dt className="text-[#78827c]">狀態</dt><dd className={selectedUnit.status === 'in_stock' ? 'font-semibold text-fern' : 'font-semibold text-[#bd5039]'}>{selectedUnit.status === 'in_stock' ? '在庫' : selectedUnit.status === 'sold' ? `已售出${selectedUnit.sold_at ? ` · ${new Date(selectedUnit.sold_at).toLocaleString('zh-TW')}` : ''}` : '停用'}</dd></dl>{selectedUnit.status === 'in_stock' && selectedUnit.product_active && <div className="mt-4 space-y-3"><button disabled={!canManage || saving} onClick={() => void sellScannedUnit()} className="h-10 w-full rounded-md bg-ink text-xs font-semibold text-white disabled:opacity-50">{saving ? '處理中…' : '出售此件'}</button><div className="flex gap-2"><select value={unitTargetStoreId} onChange={(event) => setUnitTargetStoreId(event.target.value)} className="h-10 min-w-0 flex-1 rounded-md border-[#dfe5de] bg-white text-xs"><option value="">選擇調撥目的分店</option>{stores.filter((store) => store.id !== selectedUnit.store_id).map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}</select><button disabled={!canManage || saving || !unitTargetStoreId} onClick={() => void transferScannedUnit()} className="h-10 rounded-md border border-[#dce2db] px-3 text-xs font-semibold disabled:opacity-40">調撥此件</button></div></div>}{!selectedUnit.product_active && <p className="mt-4 text-xs text-[#bd5039]">商品主檔已停用，不能出售或調撥。</p>}<p className="mt-4 text-[11px] text-[#87918a]">QR 識別此實體單位；重新列印不會變更 UUID 或內部序號。</p></section>}
 
         {(dialog === 'create' || dialog === 'edit') && <form onSubmit={(event) => void saveProduct(event)} className="my-auto w-full max-w-xl rounded-lg bg-white p-5 shadow-xl">
-          <div className="mb-5 flex items-start justify-between"><div><p className="eyebrow">{dialog === 'edit' ? 'EDIT PRODUCT' : 'NEW PRODUCT'}</p><h2 className="mt-1 text-lg font-semibold">{dialog === 'edit' ? '編輯商品' : '新增商品'}</h2></div><button type="button" onClick={closeDialog} aria-label="關閉" className="grid h-8 w-8 place-items-center rounded-md hover:bg-canvas"><X size={17} /></button></div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="text-xs font-semibold">商品名稱<input required maxLength={120} value={productForm.name} onChange={(event) => setProductForm({ ...productForm, name: event.target.value })} className="mt-1.5 h-10 w-full rounded-md border-[#dfe5de] text-sm focus:border-fern focus:ring-fern" /></label>
-              <label className="text-xs font-semibold">型號（選填）<input maxLength={120} value={productForm.model} onChange={(event) => setProductForm({ ...productForm, model: event.target.value })} className="mt-1.5 h-10 w-full rounded-md border-[#dfe5de] text-sm focus:border-fern focus:ring-fern" /></label>
+          <div className="mb-5 flex items-start justify-between"><div><p className="eyebrow">{dialog === 'edit' ? 'EDIT PRODUCT' : createStep === 1 ? 'NEW PRODUCT · STEP 1 OF 2' : 'NEW PRODUCT · STEP 2 OF 2'}</p><h2 className="mt-1 text-lg font-semibold">{dialog === 'edit' ? '編輯商品' : '新增商品'}</h2></div><button type="button" onClick={closeDialog} aria-label="關閉" className="grid h-8 w-8 place-items-center rounded-md hover:bg-canvas"><X size={17} /></button></div>
+          {dialog === 'create' && createStep === 1 ? <div><p className="mb-3 text-xs font-semibold">先選擇商品分類</p><div className="grid gap-2 sm:grid-cols-2">{inventoryCategories.map((category) => <button key={category.value} type="button" onClick={() => { setProductForm((current) => ({ ...current, category: category.value })); setProductFormError(''); setCreateStep(2); }} className={`min-h-12 rounded-md border px-4 py-3 text-left text-sm font-semibold transition-colors ${productForm.category === category.value ? 'border-fern bg-[#eaf2e9] text-fern' : 'border-[#dfe5de] bg-white hover:border-fern hover:bg-[#f7faf6]'}`}>{category.label}</button>)}</div></div> : <><div className="grid gap-4 sm:grid-cols-2">
+              <label className="text-xs font-semibold">品牌（選填）<div className="relative mt-1.5" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setBrandMenuOpen(false); }}><input maxLength={80} role="combobox" aria-autocomplete="list" aria-expanded={brandMenuOpen} aria-controls="inventory-brand-options" value={productForm.brand} onFocus={() => setBrandMenuOpen(true)} onChange={(event) => { setProductForm({ ...productForm, brand: event.target.value }); setBrandMenuOpen(true); }} onKeyDown={(event) => { if (event.key === 'Escape') setBrandMenuOpen(false); }} placeholder={categoryHints[productForm.category]?.brands ?? '選擇或輸入品牌'} className="h-10 w-full rounded-md border-[#dfe5de] text-sm focus:border-fern focus:ring-fern" />{brandMenuOpen && filteredBrandOptions.length > 0 && <div id="inventory-brand-options" role="listbox" className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-[#dfe5de] bg-white py-1 shadow-lg">{filteredBrandOptions.map((brand) => <button key={brand} type="button" role="option" aria-selected={productForm.brand === brand} onMouseDown={(event) => event.preventDefault()} onClick={() => { setProductForm((current) => ({ ...current, brand })); setBrandMenuOpen(false); }} className="block w-full px-3 py-2 text-left text-xs font-medium hover:bg-[#f3f5f0]">{brand}</button>)}</div>}</div></label>
+              <label className="text-xs font-semibold">商品名稱<input required maxLength={120} value={productForm.name} onChange={(event) => setProductForm({ ...productForm, name: event.target.value })} placeholder={categoryHints[productForm.category]?.name ?? '輸入商品名稱'} className="mt-1.5 h-10 w-full rounded-md border-[#dfe5de] text-sm focus:border-fern focus:ring-fern" /></label>
+              <label className="text-xs font-semibold">型號（選填）<input maxLength={120} value={productForm.model} onChange={(event) => setProductForm({ ...productForm, model: event.target.value })} placeholder={categoryHints[productForm.category]?.model ?? '填寫商品型號'} className="mt-1.5 h-10 w-full rounded-md border-[#dfe5de] text-sm focus:border-fern focus:ring-fern" /></label>
               <label className="text-xs font-semibold">序號（選填）<input maxLength={120} value={productForm.serial_number} onChange={(event) => setProductForm({ ...productForm, serial_number: event.target.value })} className="mt-1.5 h-10 w-full rounded-md border-[#dfe5de] text-sm focus:border-fern focus:ring-fern" /></label>
-              <label className="text-xs font-semibold">分類<select required value={productForm.category} onChange={(event) => setProductForm({ ...productForm, category: event.target.value })} className="mt-1.5 h-10 w-full rounded-md border-[#dfe5de] bg-white text-sm focus:border-fern focus:ring-fern"><option value="">請選擇分類</option>{!inventoryCategories.some((category) => category.value === productForm.category) && productForm.category && <option value={productForm.category}>{productForm.category}（既有分類）</option>}{inventoryCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></label>
+              <div className="text-xs font-semibold">分類{dialog === 'create' ? <button type="button" onClick={() => setCreateStep(1)} className="mt-1.5 flex h-10 w-full items-center justify-between rounded-md border border-[#dfe5de] px-3 text-left text-sm font-normal"><span>{productForm.category}</span><span className="font-semibold text-fern">更改</span></button> : <select required value={productForm.category} onChange={(event) => setProductForm({ ...productForm, category: event.target.value })} className="mt-1.5 h-10 w-full rounded-md border-[#dfe5de] bg-white text-sm focus:border-fern focus:ring-fern"><option value="">請選擇分類</option>{!inventoryCategories.some((category) => category.value === productForm.category) && productForm.category && <option value={productForm.category}>{productForm.category}（既有分類）</option>}{inventoryCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select>}</div>
               <label className="text-xs font-semibold">安全庫存<input required type="number" min="0" step="1" value={productForm.reorder_threshold} onChange={(event) => setProductForm({ ...productForm, reorder_threshold: event.target.value })} className="mt-1.5 h-10 w-full rounded-md border-[#dfe5de] text-sm focus:border-fern focus:ring-fern" /></label>
               {dialog === 'create' && <><label className="text-xs font-semibold">初始數量<input required type="number" min="0" step="1" value={productForm.initial_quantity} onChange={(event) => setProductForm({ ...productForm, initial_quantity: event.target.value })} className="mt-1.5 h-10 w-full rounded-md border-[#dfe5de] text-sm focus:border-fern focus:ring-fern" /></label><label className="text-xs font-semibold">所屬分店<select required value={productForm.store_id} onChange={(event) => setProductForm({ ...productForm, store_id: event.target.value })} className="mt-1.5 h-10 w-full rounded-md border-[#dfe5de] bg-white text-sm"><option value="">請選擇分店</option>{stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}</select></label></>}
             </div>
-            <div className="mt-6 flex justify-end gap-2"><button type="button" onClick={closeDialog} className="h-9 rounded-md border border-[#dfe5de] px-3 text-xs font-semibold">取消</button><button disabled={saving || !canManage || (dialog === 'create' && stores.length === 0)} className="h-9 rounded-md bg-ink px-4 text-xs font-semibold text-white hover:bg-fern disabled:opacity-60">{saving ? '儲存中…' : dialog === 'edit' ? '儲存變更' : '建立商品'}</button></div>
+            {productForm.category && <p className="mt-3 text-[11px] text-[#78827c] sm:col-span-2">{categoryHints[productForm.category]?.details}</p>}
+            {possibleDuplicates.length > 0 && <p role="status" className="mt-3 rounded-md border border-[#f1dfb8] bg-[#fffaf0] px-3 py-2 text-xs text-[#816925]">找到相似商品：{possibleDuplicates.slice(0, 3).map((item) => `${item.name} · ${item.sku}`).join('、')}。若規格不同，仍可繼續新增。</p>}
+            {productFormNotice && <p role="status" className="mt-4 rounded-md border border-[#cbdccf] bg-[#eaf2e9] px-3 py-2 text-xs text-fern">{productFormNotice}</p>}
+            {productFormError && <p role="alert" className="mt-4 rounded-md border border-[#f0c5b8] bg-[#fff8f5] px-3 py-2 text-xs text-[#a84834]">{productFormError}</p>}
+            <div className="mt-6 flex flex-wrap justify-end gap-2 sm:col-span-2"><button type="button" onClick={closeDialog} className="h-9 rounded-md border border-[#dfe5de] px-3 text-xs font-semibold">取消</button>{dialog === 'create' && <button type="button" onClick={() => setCreateStep(1)} className="h-9 rounded-md border border-[#dfe5de] px-3 text-xs font-semibold">返回分類</button>}{dialog === 'create' && <button type="submit" name="intent" value="continue" disabled={saving || !canManage || stores.length === 0} className="h-9 rounded-md border border-fern px-3 text-xs font-semibold text-fern disabled:opacity-60">儲存並繼續新增</button>}<button disabled={saving || !canManage || (dialog === 'create' && (stores.length === 0 || !productForm.category))} className="h-9 rounded-md bg-ink px-4 text-xs font-semibold text-white hover:bg-fern disabled:opacity-60">{saving ? '儲存中…' : dialog === 'edit' ? '儲存變更' : '建立商品'}</button></div>
+          </>}
         </form>}
 
         {dialog === 'sale' && selectedItem && <form onSubmit={(event) => void recordSale(event)} className="my-auto w-full max-w-md rounded-lg bg-white p-5 shadow-xl"><div className="mb-5 flex items-start justify-between"><div><p className="eyebrow">RECORD SALE</p><h2 className="mt-1 text-lg font-semibold">登記出售</h2><p className="mt-1 text-xs text-[#78827c]">{selectedItem.name}</p></div><button type="button" onClick={closeDialog} aria-label="關閉" className="grid h-8 w-8 place-items-center rounded-md hover:bg-canvas"><X size={17} /></button></div><div className="space-y-4"><label className="block text-xs font-semibold">出售分店<select required value={saleStoreId} onChange={(event) => setSaleStoreId(event.target.value)} className="mt-1.5 h-10 w-full rounded-md border-[#dfe5de] bg-white text-sm"><option value="">請選擇分店</option>{selectedItem.stocks.map((stock) => <option key={stock.storeId} value={stock.storeId}>{stock.storeName}（庫存 {stock.quantity}）</option>)}</select></label><label className="block text-xs font-semibold">出售數量<input required type="number" min="1" max={storeStock(selectedItem, saleStoreId)} step="1" value={saleQuantity} onChange={(event) => setSaleQuantity(event.target.value)} className="mt-1.5 h-10 w-full rounded-md border-[#dfe5de] text-sm" /></label><label className="block text-xs font-semibold">備註（選填）<input maxLength={200} value={saleNote} onChange={(event) => setSaleNote(event.target.value)} className="mt-1.5 h-10 w-full rounded-md border-[#dfe5de] text-sm" /></label></div><div className="mt-6 flex justify-end gap-2"><button type="button" onClick={closeDialog} className="h-9 rounded-md border border-[#dfe5de] px-3 text-xs font-semibold">取消</button><button disabled={saving || !canManage || !saleStoreId || Number(saleQuantity) > storeStock(selectedItem, saleStoreId)} className="h-9 rounded-md bg-ink px-4 text-xs font-semibold text-white disabled:opacity-50">{saving ? '處理中…' : '確認出售並扣庫存'}</button></div></form>}
