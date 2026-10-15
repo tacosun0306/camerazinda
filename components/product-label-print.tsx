@@ -27,7 +27,7 @@ const MAX_SELECT = 5000;
 const MAX_PRINT_COPIES = 300;
 const MAX_COPIES_PER_ITEM = 100;
 
-export function ProductLabelPrint() {
+export function ProductLabelPrint({ embedded = false }: { embedded?: boolean }) {
   const [items, setItems] = useState<LabelUnit[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [selected, setSelected] = useState<Record<string, SelectedLabel>>({});
@@ -235,10 +235,10 @@ export function ProductLabelPrint() {
   return (
     <div className="space-y-6">
       <style>{`@media print { @page { size: ${labelWidth}mm ${labelHeight}mm; margin: 0; } }`}</style>
-      <section className="flex flex-wrap items-end justify-between gap-4">
+      {!embedded && <section className="flex flex-wrap items-end justify-between gap-4">
         <div><p className="eyebrow">INVENTORY LABELS</p><h1 className="mt-2 font-display text-[32px] leading-tight">商品標籤列印</h1><p className="mt-2 text-sm text-[#77827c]">只列印啟用商品；QR 綁定既有商品 ID，不會建立新商品或 SKU。</p></div>
         <Link href="/inventory" className="inline-flex h-10 items-center gap-2 rounded-md border border-[#dce2db] bg-white px-3.5 text-xs font-semibold hover:border-ink"><ArrowLeft size={15} />返回庫存</Link>
-      </section>
+      </section>}
 
       {error && <div role="alert" className="rounded-md border border-[#f0c5b8] bg-[#fff8f5] px-4 py-3 text-sm text-[#a84834]">{error}</div>}
       {notice && <div role="status" className="rounded-md border border-[#cbdccf] bg-[#eaf2e9] px-4 py-3 text-sm text-fern">{notice}</div>}

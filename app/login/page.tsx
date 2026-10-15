@@ -16,7 +16,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(circle at 78% 30%, #7c9f6c 0, transparent 28%), linear-gradient(135deg, transparent 35%, #31463c 100%)' }} />
       <Link href="/dashboard" className="relative flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-lg bg-lime text-ink"><Camera size={20} /></span><span className="text-sm font-bold tracking-wide">CAMERA STORE OS</span></Link>
       <div className="relative max-w-lg"><p className="eyebrow text-[#c7ef62]">ONE STORE. IN FOCUS.</p><h1 className="mt-5 font-display text-5xl leading-[1.1]">把店裡的每個細節，<span className="text-[#c7ef62]">都看清楚。</span></h1><p className="mt-5 max-w-md text-sm leading-7 text-[#bdc9c0]">庫存、維修、排班與團隊日常，在一個工作台清楚掌握。</p></div>
-      <p className="relative text-xs text-[#8e9c93]">台北旗艦店 · 內部營運系統</p>
+      <p className="relative text-xs text-[#8e9c93]">台南晶大門市 · 內部營運系統</p>
     </section>
     <section className="flex min-h-screen flex-col justify-center bg-[#f3f5f0] px-6 py-12 sm:px-12">
       <div className="mx-auto w-full max-w-[390px]">

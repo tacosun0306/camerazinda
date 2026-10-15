@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 import { ArrowLeftRight, Camera, PackagePlus, Pencil, Plus, Printer, QrCode, RefreshCw, Search, ShoppingBag, Store, X } from 'lucide-react';
 import { useStaffProfile } from '@/components/app-shell';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { inventoryItemIdFromQr, inventoryUnitIdFromQr } from '@/lib/inventory-qr';
+import { InventoryStocktake } from '@/components/inventory-stocktake';
+import { ProductLabelPrint } from '@/components/product-label-print';
 
 type StoreLocation = { id: string; name: string };
 type ItemStock = { storeId: string; storeName: string; quantity: number };
@@ -68,6 +69,7 @@ type ProductForm = {
   store_id: string;
 };
 type DialogMode = 'actions' | 'create' | 'edit' | 'unit' | 'unit-operation' | 'receive' | 'sale' | 'transfer' | 'store' | null;
+type InventoryTab = 'products' | 'stocktake' | 'labels' | 'movements';
 
 const emptyProduct: ProductForm = {
   name: '', brand: '', model: '', barcode: '', serial_number: '', category: '',
@@ -85,6 +87,12 @@ const inventoryCategories = [
   { value: '記憶卡', label: '記憶卡' },
   { value: '原廠電池', label: '原廠電池' },
   { value: '配件', label: '配件' },
+];
+const inventoryTabs: { id: InventoryTab; label: string }[] = [
+  { id: 'products', label: '商品庫存管理' },
+  { id: 'stocktake', label: '線上盤點' },
+  { id: 'labels', label: '標籤列印' },
+  { id: 'movements', label: '庫存異動紀錄' },
 ];
 const commonInventoryBrands = [
   'Canon', 'Fujifilm', 'Hasselblad', 'Kingston', 'Leica', 'Lexar', 'Nikon', 'Olympus',
@@ -134,6 +142,7 @@ export function InventoryManagement() {
   const [query, setQuery] = useState('');
   const [scanInput, setScanInput] = useState('');
   const [dialog, setDialog] = useState<DialogMode>(null);
+  const [activeTab, setActiveTab] = useState<InventoryTab>('products');
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<InventoryUnit | null>(null);
   const [unitOptions, setUnitOptions] = useState<UnitOption[]>([]);
@@ -691,19 +700,22 @@ export function InventoryManagement() {
           <h1 className="mt-2 font-display text-[32px] leading-tight">庫存管理</h1>
           <p className="mt-2 text-sm text-[#77827c]">掃碼建檔、出售扣庫存，或將商品轉至其他分店。</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/inventory/labels" className="inline-flex h-10 items-center gap-2 rounded-md border border-[#dce2db] bg-white px-3 text-xs font-semibold hover:border-ink"><Printer size={15} />標籤列印</Link>
+        {activeTab === 'products' && <div className="flex flex-wrap gap-2">
           {['admin', 'manager'].includes(profile?.role ?? '') && <button onClick={() => { setStoreName(''); setDialog('store'); }} className="inline-flex h-10 items-center gap-2 rounded-md border border-[#dce2db] bg-white px-3 text-xs font-semibold hover:border-ink"><Store size={15} />新增分店</button>}
           <button onClick={() => { setScannerError(''); setScannerOpen(true); }} className="inline-flex h-10 items-center gap-2 rounded-md border border-[#dce2db] bg-white px-3 text-xs font-semibold hover:border-ink"><Camera size={15} />掃描 QR</button>
           <button onClick={() => { setSelectedItem(null); setProductForm({ ...emptyProduct, store_id: stores[0]?.id ?? '' }); setCreateStep(1); setProductFormError(''); setProductFormNotice(''); setDialog('create'); }} className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-3.5 text-xs font-semibold text-white hover:bg-fern"><PackagePlus size={15} />新增商品</button>
           <button onClick={() => void refresh()} aria-label="重新載入庫存" className="grid h-10 w-10 place-items-center rounded-md border border-[#dce2db] bg-white hover:border-ink"><RefreshCw size={15} /></button>
-        </div>
+        </div>}
       </section>
+
+      <nav role="tablist" aria-label="庫存管理子分頁" className="flex gap-1 overflow-x-auto border-b border-[#dfe5de]">
+        {inventoryTabs.map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={activeTab === tab.id} onClick={() => setActiveTab(tab.id)} className={`shrink-0 border-b-2 px-4 py-3 text-sm font-semibold transition-colors ${activeTab === tab.id ? 'border-fern text-fern' : 'border-transparent text-[#78827c] hover:text-ink'}`}>{tab.label}</button>)}
+      </nav>
 
       {error && <div role="alert" className="rounded-md border border-[#f0c5b8] bg-[#fff8f5] px-4 py-3 text-sm text-[#a84834]">{error}</div>}
       {notice && <div role="status" className="rounded-md border border-[#cbdccf] bg-[#eaf2e9] px-4 py-3 text-sm text-fern">{notice}</div>}
 
-      <section className="grid gap-3 sm:grid-cols-3">
+      {activeTab === 'products' && <><section className="grid gap-3 sm:grid-cols-3">
         <div className="panel p-4"><p className="eyebrow">商品品項</p><p className="metric-value mt-4">{loading ? '—' : items.length}</p></div>
         <div className="panel p-4"><p className="eyebrow">各店總庫存</p><p className="metric-value mt-4">{loading ? '—' : totalUnits.toLocaleString('zh-TW')}</p></div>
         <div className="panel p-4"><p className="eyebrow">低於安全庫存</p><p className="metric-value mt-4">{loading ? '—' : lowStockItems}</p></div>
@@ -736,9 +748,12 @@ export function InventoryManagement() {
           </div>
         </div>
         <div className="flex items-center justify-between border-t border-[#edf0eb] px-5 py-3 text-[11px] text-[#87918a]"><span>庫存異動會記錄操作人員與時間</span><span>來源：Supabase</span></div>
-      </section>
+      </section></>}
 
-      <section className="panel overflow-hidden">
+      {activeTab === 'stocktake' && <InventoryStocktake stores={stores} role={profile?.role} />}
+      {activeTab === 'labels' && <ProductLabelPrint embedded />}
+
+      {activeTab === 'movements' && <section className="panel overflow-hidden">
         <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#edf0eb] px-4 py-4 md:px-5">
           <div><p className="eyebrow">{movementsLoading ? '查詢中' : `${movements.length} 筆異動`}</p><h2 className="mt-1 text-base font-semibold">庫存異動紀錄</h2></div>
           <form onSubmit={(event) => { event.preventDefault(); void loadMovements(); }} className="flex flex-wrap items-end gap-2">
@@ -765,7 +780,7 @@ export function InventoryManagement() {
           </div>
         </div>
         <div className="flex items-center justify-between border-t border-[#edf0eb] px-5 py-3 text-[11px] text-[#87918a]"><span>{movements.length === 500 ? '目前最多顯示 500 筆，請縮小日期範圍' : `查詢範圍：${movementFrom} 至 ${movementTo}`}</span><span>操作人員與職務依異動當下記錄</span></div>
-      </section>
+      </section>}
 
       {scannerOpen && <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-ink/55 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setScannerOpen(false); }}><section role="dialog" aria-modal="true" aria-labelledby="scanner-title" className="my-auto w-full max-w-lg rounded-lg bg-white p-5 shadow-xl"><div className="mb-4 flex items-start justify-between"><div><p className="eyebrow">CAMERA SCANNER</p><h2 id="scanner-title" className="mt-1 text-lg font-semibold">掃描商品 QR / 條碼</h2></div><button onClick={() => setScannerOpen(false)} aria-label="關閉掃描器" className="grid h-8 w-8 place-items-center rounded-md hover:bg-canvas"><X size={17} /></button></div><video ref={videoRef} className="aspect-video w-full rounded-md bg-ink object-cover" muted playsInline />{scannerError && <p role="alert" className="mt-3 rounded-md bg-[#fff8f5] p-3 text-xs text-[#a84834]">{scannerError}</p>}<p className="mt-3 text-xs text-[#78827c]">掃到已建檔商品會開啟操作；新 QR 碼會帶入新增商品表單。</p></section></div>}
 
