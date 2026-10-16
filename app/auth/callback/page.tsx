@@ -26,6 +26,8 @@ export default function AuthCallbackPage() {
       const supabase = createSupabaseBrowserClient();
       const tokenHash = query.get('token_hash');
       const code = query.get('code');
+      const accessToken = hash.get('access_token');
+      const refreshToken = hash.get('refresh_token');
       if (tokenHash) {
         const { error: verifyError } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: flow });
         if (verifyError) {
@@ -38,6 +40,18 @@ export default function AuthCallbackPage() {
           setError('連結已失效或使用過，請聯絡管理員重新寄送。');
           return;
         }
+      } else if (accessToken && refreshToken) {
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (sessionError) {
+          setError('連結已失效或使用過，請聯絡管理員重新寄送。');
+          return;
+        }
+      } else if (accessToken || refreshToken) {
+        setError('驗證連結資料不完整，請聯絡管理員重新寄送。');
+        return;
       }
 
       const { data: { user }, error: userError } = await supabase.auth.getUser();
