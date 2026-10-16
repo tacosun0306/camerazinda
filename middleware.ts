@@ -48,7 +48,7 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(loginUrl);
       }
       if (profile.account_status === 'active' && profile.active) {
-        return NextResponse.redirect(new URL('/dashboard', request.url));
+        return NextResponse.redirect(new URL(profile.role === 'technician' ? '/repairs' : '/dashboard', request.url));
       }
       if (profile.account_status !== 'pending_password_setup' && profile.account_status !== 'password_reset_pending') {
         const loginUrl = request.nextUrl.clone();
@@ -66,6 +66,11 @@ export async function middleware(request: NextRequest) {
       loginUrl.pathname = '/login';
       loginUrl.searchParams.set('error', profile?.account_status === 'pending_password_setup' ? 'first_setup' : profile?.account_status === 'password_reset_pending' ? 'password_reset' : 'profile');
       return NextResponse.redirect(loginUrl);
+    }
+    const technicianAuthPaths = [accountPasswordPath, '/api/account/password', '/api/auth/password-challenge'];
+    if (profile.role === 'technician' && pathname !== '/repairs' && !pathname.startsWith('/repairs/') && !technicianAuthPaths.includes(pathname)) {
+      if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'Technicians can only access repair cases.' }, { status: 403 });
+      return NextResponse.redirect(new URL('/repairs', request.url));
     }
     if (profile.role === 'sales' && ['/schedule', '/attendance'].some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
@@ -85,13 +90,14 @@ export async function middleware(request: NextRequest) {
   if (user && pathname === '/login') {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('active, account_status')
+      .select('active, account_status, role')
       .eq('id', user.id)
       .maybeSingle();
     if (profile?.account_status === 'pending_password_setup' || profile?.account_status === 'password_reset_pending') {
       return NextResponse.redirect(new URL(accountPasswordPath, request.url));
     }
     if (!profile?.active || profile.account_status !== 'active') return response;
+    if (profile.role === 'technician') return NextResponse.redirect(new URL('/repairs', request.url));
     const nextPath = request.nextUrl.searchParams.get('next');
     if (nextPath?.startsWith('/inventory') && !nextPath.startsWith('//') && !nextPath.includes('\\')) {
       return NextResponse.redirect(new URL(nextPath, request.url));

@@ -85,7 +85,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {menuOpen && <button aria-label="關閉導覽選單" className="mobile-overlay fixed inset-0 z-40 md:hidden" onClick={() => setMenuOpen(false)} />}
       <aside className={`sidebar flex shrink-0 flex-col px-4 py-5 ${menuOpen ? 'open' : ''}`}>
         <div className="flex items-center justify-between px-2 pb-8">
-          <Link href="/dashboard" className="flex items-center gap-3" onClick={() => setMenuOpen(false)}>
+          <Link href={!profile || profile.role === 'technician' ? '/repairs' : '/dashboard'} className="flex items-center gap-3" onClick={() => setMenuOpen(false)}>
             <span className="grid h-9 w-9 place-items-center rounded-lg bg-lime text-ink"><Camera size={19} strokeWidth={2.2} /></span>
             <span><span className="block text-sm font-bold tracking-tight">CAMERA STORE</span><span className="mt-0.5 block text-[10px] font-medium tracking-[.16em] text-[#9ca9a1]">OPERATIONS OS</span></span>
           </Link>
@@ -93,12 +93,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <p className="eyebrow px-3 pb-2 text-[#75827a]">工作台</p>
         <nav className="space-y-1" aria-label="主要導覽">
-          {modules.filter(({ href }) => {
-            if (['/schedule', '/attendance'].includes(href) && !['admin', 'manager', 'technician'].includes(profile?.role ?? '')) return false;
-            if (href === '/users') return profile?.role === 'admin';
-            if (['/roles', '/audit-logs'].includes(href)) return profile?.role === 'admin' || profile?.role === 'manager';
+          {(profile ? modules.filter(({ href }) => {
+            if (profile.role === 'technician') return href === '/repairs';
+            if (['/schedule', '/attendance'].includes(href) && !['admin', 'manager'].includes(profile.role)) return false;
+            if (href === '/users') return profile.role === 'admin';
+            if (['/roles', '/audit-logs'].includes(href)) return profile.role === 'admin' || profile.role === 'manager';
             return true;
-          }).map(({ href, label, icon: Icon }) => (
+          }) : modules.filter(({ href }) => href === '/repairs')).map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} onClick={() => setMenuOpen(false)} className={`nav-link ${pathname === href ? 'active' : ''}`}>
               <Icon size={17} strokeWidth={1.8} /><span>{label}</span>
               {href === '/repairs' && repairCount !== null && repairCount > 0 && <span className="ml-auto rounded-full bg-[#e36d52] px-1.5 py-0.5 text-[10px] font-bold text-white">{repairCount}</span>}
