@@ -37,6 +37,7 @@ button { cursor: pointer; }
 .repair-detail-aside[data-active-tab='logistics'] > section:nth-child(3),
 .repair-detail-aside[data-active-tab='status'] > form:nth-child(4),
 .repair-detail-aside[data-active-tab='history'] > section:nth-child(5) { display: block; }
+.repair-detail-aside[data-active-tab='basic'][data-role='technician'] > form:first-child { display: none; }
 .mobile-overlay { background: rgb(16 26 23 / 48%); }
 [class~="text-[10px]"] { font-size: 12px; }
 [class~="text-[11px]"] { font-size: 13px; }
