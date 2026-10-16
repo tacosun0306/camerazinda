@@ -18,6 +18,10 @@ export default function AuthCallbackPage() {
         setError('連結格式無效，請聯絡管理員重新寄送。');
         return;
       }
+      if (query.has('error') || query.has('error_description') || hash.has('error') || hash.has('error_description')) {
+        setError('此設定連結已失效或逾期，請聯絡管理員重新寄送。');
+        return;
+      }
 
       const supabase = createSupabaseBrowserClient();
       const tokenHash = query.get('token_hash');
