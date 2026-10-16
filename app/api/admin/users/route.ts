@@ -36,7 +36,15 @@ export async function GET() {
       message,
     });
     const status = message.includes('admin credentials') ? 503 : 500;
-    return NextResponse.json({ error: status === 503 ? '尚未設定伺服器端 Supabase Admin 憑證' : '無法載入人員資料' }, { status });
+    const diagnostic = encodeURIComponent(JSON.stringify({
+      name: typeof errorObject?.name === 'string' ? errorObject.name : undefined,
+      code: typeof errorObject?.code === 'string' ? errorObject.code : undefined,
+      message: message.slice(0, 300),
+    }));
+    return NextResponse.json(
+      { error: status === 503 ? '尚未設定伺服器端 Supabase Admin 憑證' : '無法載入人員資料' },
+      { status, headers: { 'x-admin-users-diagnostic': diagnostic } },
+    );
   }
 }
 
