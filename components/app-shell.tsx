@@ -94,6 +94,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <p className="eyebrow px-3 pb-2 text-[#75827a]">工作台</p>
         <nav className="space-y-1" aria-label="主要導覽">
           {modules.filter(({ href }) => {
+            if (profile?.role === 'sales' && ['/schedule', '/attendance'].includes(href)) return false;
             if (href === '/users') return profile?.role === 'admin';
             if (['/roles', '/audit-logs'].includes(href)) return profile?.role === 'admin' || profile?.role === 'manager';
             return true;

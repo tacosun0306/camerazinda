@@ -63,7 +63,7 @@ export async function loadWorkspaceRecords(client: SupabaseClient, moduleKey: Wo
     (data ?? []).filter((profile) => profile.active).forEach((profile) => counts.set(profile.role, (counts.get(profile.role) ?? 0) + 1));
     return (['admin', 'manager', 'sales', 'technician'] as const).map((role) => ({
       id: role,
-      cells: [roleLabels[role], `${counts.get(role) ?? 0} 人`, ['admin', 'manager', 'sales'].includes(role) ? '檢視 / 編輯' : '檢視', ['admin', 'manager'].includes(role) ? '檢視 / 編輯' : role === 'technician' ? '檢視 / 編輯' : '檢視', ['admin', 'manager'].includes(role) ? '檢視 / 編輯' : '無權限'],
+      cells: [roleLabels[role], `${counts.get(role) ?? 0} 人`, ['admin', 'manager', 'sales'].includes(role) ? '檢視 / 編輯' : '檢視', ['admin', 'manager', 'sales', 'technician'].includes(role) ? '檢視 / 編輯' : '檢視', ['admin', 'manager'].includes(role) ? '檢視 / 編輯' : '無權限'],
     }));
   }
 
@@ -159,14 +159,16 @@ export async function updateWorkspaceRecord(client: SupabaseClient, moduleKey: W
     return;
   }
   if (moduleKey === 'repairs') {
-    const { error } = await client.from('repair_jobs').update({
-      customer_name: values.customer_name,
-      customer_phone: values.customer_phone,
-      item_name: values.item_name,
-      issue: values.issue,
-      due_at: values.due_at || null,
-      status: values.status,
-    }).eq('id', recordId);
+    const { error } = await client.rpc('update_repair_job', {
+      p_repair_job_id: recordId,
+      p_case_number: values.case_number,
+      p_customer_name: values.customer_name,
+      p_customer_phone: values.customer_phone,
+      p_item_name: values.item_name,
+      p_issue: values.issue,
+      p_due_at: values.due_at || null,
+      p_status: values.status,
+    });
     fail(error);
     return;
   }

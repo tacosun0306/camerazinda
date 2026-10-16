@@ -67,6 +67,9 @@ export async function middleware(request: NextRequest) {
       loginUrl.searchParams.set('error', profile?.account_status === 'pending_password_setup' ? 'first_setup' : profile?.account_status === 'password_reset_pending' ? 'password_reset' : 'profile');
       return NextResponse.redirect(loginUrl);
     }
+    if (profile.role === 'sales' && ['/schedule', '/attendance'].some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
     if (pathname === '/users' && profile.role !== 'admin') {
       const dashboardUrl = request.nextUrl.clone();
       dashboardUrl.pathname = '/dashboard';

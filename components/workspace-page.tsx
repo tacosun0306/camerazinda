@@ -85,7 +85,7 @@ export function WorkspacePage({ moduleKey }: { moduleKey: WorkspaceKey }) {
       const supabase = createSupabaseBrowserClient();
       if (editing) {
         await updateWorkspaceRecord(supabase, moduleKey, editing.id, values);
-        await addAuditLog(supabase, profile.id, `${moduleKey}_updated`, moduleKey, editing.id);
+        if (moduleKey !== 'repairs') await addAuditLog(supabase, profile.id, `${moduleKey}_updated`, moduleKey, editing.id);
       } else {
         await createWorkspaceRecord(supabase, moduleKey, values, profile.id);
         await addAuditLog(supabase, profile.id, `${moduleKey}_created`, moduleKey, values.case_number ?? values.sku ?? '');
@@ -105,9 +105,9 @@ export function WorkspacePage({ moduleKey }: { moduleKey: WorkspaceKey }) {
     try {
       const supabase = createSupabaseBrowserClient();
       const status = pendingValues[record.id] ?? record.editableValue;
-      const { error: updateError } = await supabase.from('repair_jobs').update({ status }).eq('id', record.id);
-      if (updateError) throw updateError;
-      await addAuditLog(supabase, profile.id, 'repair_status_updated', 'repair_job', record.id, { status });
+      const values = toFormValues(moduleContent.repairs.fields, record.data);
+      values.status = status;
+      await updateWorkspaceRecord(supabase, 'repairs', record.id, values);
       await refresh();
       setNotice('維修狀態已更新');
     } catch (saveError) {
@@ -135,9 +135,10 @@ export function WorkspacePage({ moduleKey }: { moduleKey: WorkspaceKey }) {
   }
 
   const canEditInventory = profile && ['admin', 'manager', 'sales'].includes(profile.role);
-  const canUpdateRepair = profile && ['admin', 'manager', 'technician'].includes(profile.role);
+  const canUpdateRepair = profile && ['admin', 'manager', 'sales', 'technician'].includes(profile.role);
   const ownAttendance = records.find((record) => record.data?.employee_id === profile?.id && record.data?.punch_id && !record.data?.clocked_out_at);
   const canShowActions = (moduleKey === 'inventory' && canEditInventory) || (moduleKey === 'repairs' && canUpdateRepair);
+  const actionsWidth = moduleKey === 'repairs' ? '260px' : '150px';
 
   return (
     <div className="space-y-6">
@@ -152,11 +153,11 @@ export function WorkspacePage({ moduleKey }: { moduleKey: WorkspaceKey }) {
       {error && <div role="alert" className="rounded-md border border-[#f0c5b8] bg-[#fff8f5] px-4 py-3 text-sm text-[#a84834]">{error}</div>}
       <section className="panel overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#edf0eb] px-4 py-4 md:px-5"><div><p className="eyebrow">{loading ? '讀取中' : `${filteredRecords.length} 筆資料`}</p><h2 className="mt-1 text-base font-semibold">{config.title}清單</h2></div><label className="flex h-9 w-full max-w-[260px] items-center gap-2 rounded-md border border-[#dfe5de] bg-white px-3 focus-within:border-fern"><Search size={15} className="shrink-0 text-[#89928d]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜尋資料..." className="w-full border-0 bg-transparent p-0 text-xs outline-none placeholder:text-[#a0a8a2] focus:ring-0" /></label></div>
-        <div className="overflow-x-auto"><div className="min-w-[660px]"><div className="data-row grid gap-3 bg-[#fafbf9] px-5 py-3 text-[10px] font-semibold text-[#87918a]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr)) ${canShowActions ? '150px' : ''}` }}>{config.columns.map((column) => <span key={column}>{column}</span>)}{canShowActions && <span>操作</span>}</div>
+        <div className="overflow-x-auto"><div className={moduleKey === 'repairs' ? 'min-w-[980px]' : 'min-w-[660px]'}><div className="data-row grid gap-3 bg-[#fafbf9] px-5 py-3 text-[10px] font-semibold text-[#87918a]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr)) ${canShowActions ? actionsWidth : ''}` }}>{config.columns.map((column) => <span key={column}>{column}</span>)}{canShowActions && <span>操作</span>}</div>
           {loading && <div className="px-5 py-12 text-center text-sm text-[#87918a]">正在從 Supabase 載入…</div>}
-          {!loading && filteredRecords.map((record) => <div key={record.id} className="data-row min-h-[58px] gap-3 px-5 py-3 text-xs" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr)) ${canShowActions ? '150px' : ''}` }}>{record.cells.map((cell, cellIndex) => <span key={`${cell}-${cellIndex}`} className="truncate" title={cell}>{cellIndex === record.cells.length - 1 ? <span className={`status-pill ${statusTone(cell)}`}>{cell}</span> : <span className={cellIndex === 0 ? 'font-semibold text-ink' : 'text-[#65716b]'}>{cell}</span>}</span>)}
+          {!loading && filteredRecords.map((record) => <div key={record.id} className="data-row min-h-[58px] gap-3 px-5 py-3 text-xs" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr)) ${canShowActions ? actionsWidth : ''}` }}>{record.cells.map((cell, cellIndex) => <span key={`${cell}-${cellIndex}`} className="truncate" title={cell}>{cellIndex === record.cells.length - 1 ? <span className={`status-pill ${statusTone(cell)}`}>{cell}</span> : <span className={cellIndex === 0 ? 'font-semibold text-ink' : 'text-[#65716b]'}>{cell}</span>}</span>)}
             {moduleKey === 'inventory' && canEditInventory && <span className="flex items-center gap-2"><button onClick={() => openEdit(record)} className="text-xs font-semibold text-fern hover:underline">編輯品項</button></span>}
-            {moduleKey === 'repairs' && canUpdateRepair && <span className="flex items-center gap-1"><select aria-label={`${record.cells[0]}維修狀態`} value={pendingValues[record.id] ?? record.editableValue} onChange={(event) => setPendingValues((current) => ({ ...current, [record.id]: event.target.value }))} className="h-8 min-w-0 rounded border-[#dfe5de] bg-white text-xs">{repairStatuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select><button disabled={savingId === record.id || (pendingValues[record.id] ?? record.editableValue) === record.editableValue} onClick={() => void saveRepairStatus(record)} className="text-xs font-semibold text-fern disabled:opacity-40">儲存</button></span>}
+            {moduleKey === 'repairs' && canUpdateRepair && <span className="flex flex-wrap items-center gap-x-2 gap-y-1"><button onClick={() => openEdit(record)} className="text-xs font-semibold text-fern hover:underline">編輯案件</button><select aria-label={`${record.cells[0]}維修狀態`} value={pendingValues[record.id] ?? record.editableValue} onChange={(event) => setPendingValues((current) => ({ ...current, [record.id]: event.target.value }))} className="h-8 min-w-0 rounded border-[#dfe5de] bg-white text-xs">{repairStatuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select><button disabled={savingId === record.id || (pendingValues[record.id] ?? record.editableValue) === record.editableValue} onClick={() => void saveRepairStatus(record)} className="text-xs font-semibold text-fern disabled:opacity-40">儲存</button></span>}
           </div>)}
           {!loading && !error && filteredRecords.length === 0 && <div className="px-5 py-14 text-center text-sm text-[#87918a]">目前沒有資料</div>}
           </div></div>
