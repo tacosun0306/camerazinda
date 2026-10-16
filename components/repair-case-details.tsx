@@ -63,6 +63,16 @@ const basicFields = ['customer_name', 'customer_phone', 'brand', 'item_name', 'm
 const inspectionFields = ['inspection_person_id', 'inspection_at', 'fault_cause', 'inspection_result', 'recommended_repair', 'inspection_notes'];
 const repairFields = ['actual_repair_items', 'replacement_parts', 'repair_result', 'repaired_at', 'repaired_by'];
 const terminalStatuses = ['picked_up', 'repair_cancelled', 'unrepairable'];
+const repairDetailTabs = [
+  { id: 'basic', label: 'A. 基本資料' },
+  { id: 'inspection', label: 'B. 檢測紀錄' },
+  { id: 'quote', label: 'C. 報價明細' },
+  { id: 'repair', label: 'D. 維修紀錄' },
+  { id: 'logistics', label: 'E. 寄送與取件' },
+  { id: 'status', label: 'F. 案件狀態' },
+  { id: 'history', label: 'G. 案件歷程' },
+] as const;
+type RepairDetailTab = typeof repairDetailTabs[number]['id'];
 const statusLabel = (value: string) => repairStatuses.find((item) => item.value === value)?.label ?? value;
 const localDateTime = (value: string | null | undefined) => {
   if (!value) return '';
@@ -121,6 +131,7 @@ export function RepairCaseDetails({ job, role, onClose, onSaved }: { job: Repair
   const [quoteLines, setQuoteLines] = useState<QuoteLine[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [notifications, setNotifications] = useState<RepairNotification[]>([]);
+  const [activeTab, setActiveTab] = useState<RepairDetailTab>('basic');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -144,6 +155,16 @@ export function RepairCaseDetails({ job, role, onClose, onSaved }: { job: Repair
     if (role === 'technician') return new Set([...inspectionFields, ...repairFields]);
     return new Set([...basicFields, ...inspectionFields, ...repairFields]);
   }, [role]);
+  const tabFields: Record<RepairDetailTab, string[]> = {
+    basic: basicFields,
+    inspection: inspectionFields,
+    quote: [],
+    repair: repairFields,
+    logistics: [],
+    status: [],
+    history: [],
+  };
+  const canSaveCurrentTab = tabFields[activeTab].some((field) => editableFields.has(field));
   const latestQuote = quotes[0];
   const itemsByQuote = useMemo(() => {
     const result = new Map<string, QuoteLine[]>();
@@ -371,15 +392,18 @@ export function RepairCaseDetails({ job, role, onClose, onSaved }: { job: Repair
       <div className="overflow-y-auto p-4 sm:p-6">
         {error && <p role="alert" className="mb-4 rounded-md border border-[#f0c5b8] bg-[#fff8f5] px-4 py-3 text-sm text-[#a84834]">{error}</p>}
         {notice && <p role="status" className="mb-4 rounded-md border border-[#cbdccf] bg-[#eaf2e9] px-4 py-3 text-sm text-fern">{notice}</p>}
-        <div className="grid gap-4 xl:grid-cols-2">
-          <form onSubmit={saveChanges} className="panel space-y-5 p-4 sm:p-5">
-            <section><h3 className="text-sm font-semibold">A. 基本資料</h3><div className="mt-3 grid gap-3 sm:grid-cols-2"><ReadOnly label="案件編號" value={job.case_number} /><ReadOnly label="建立時間" value={formatDateTime(job.created_at)} /><ReadOnly label="建立人員" value={profiles.find((person) => person.id === job.created_by)?.full_name ?? job.created_by} /><ReadOnly label="門市" value={job.store_name} />{basicFields.map(renderField)}</div></section>
-            <section><h3 className="text-sm font-semibold">B. 檢測紀錄</h3><div className="mt-3 grid gap-3 sm:grid-cols-2">{inspectionFields.map(renderField)}</div></section>
-            <section><h3 className="text-sm font-semibold">D. 維修紀錄</h3><div className="mt-3 grid gap-3 sm:grid-cols-2">{repairFields.map(renderField)}</div></section>
-            {editableFields.size > 0 && <div className="flex justify-end border-t border-[#edf0eb] pt-4"><button disabled={saving || loading} className="h-9 rounded-md bg-ink px-4 text-xs font-semibold text-white disabled:opacity-50">儲存案件資料</button></div>}
+        <nav role="tablist" aria-label="維修案件資料分頁" className="mb-4 flex gap-1 overflow-x-auto border-b border-[#dfe5de]">
+          {repairDetailTabs.map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={activeTab === tab.id} onClick={() => setActiveTab(tab.id)} className={`shrink-0 border-b-2 px-3 py-3 text-xs font-semibold ${activeTab === tab.id ? 'border-fern text-fern' : 'border-transparent text-[#78827c] hover:text-ink'}`}>{tab.label}</button>)}
+        </nav>
+        <div className={`grid gap-4 ${activeTab === 'basic' ? 'xl:grid-cols-2' : ''}`}>
+          <form onSubmit={saveChanges} className={`${['basic', 'inspection', 'repair'].includes(activeTab) ? 'panel space-y-5 p-4 sm:p-5' : 'hidden'}`}>
+            {activeTab === 'basic' && <section><h3 className="text-sm font-semibold">A. 基本資料</h3><div className="mt-3 grid gap-3 sm:grid-cols-2"><ReadOnly label="案件編號" value={job.case_number} /><ReadOnly label="建立時間" value={formatDateTime(job.created_at)} /><ReadOnly label="建立人員" value={profiles.find((person) => person.id === job.created_by)?.full_name ?? job.created_by} /><ReadOnly label="門市" value={job.store_name} />{basicFields.map(renderField)}</div></section>}
+            {activeTab === 'inspection' && <section><h3 className="text-sm font-semibold">B. 檢測紀錄</h3><div className="mt-3 grid gap-3 sm:grid-cols-2">{inspectionFields.map(renderField)}</div></section>}
+            {activeTab === 'repair' && <section><h3 className="text-sm font-semibold">D. 維修紀錄</h3><div className="mt-3 grid gap-3 sm:grid-cols-2">{repairFields.map(renderField)}</div></section>}
+            {canSaveCurrentTab && <div className="flex justify-end border-t border-[#edf0eb] pt-4"><button disabled={saving || loading} className="h-9 rounded-md bg-ink px-4 text-xs font-semibold text-white disabled:opacity-50">儲存案件資料</button></div>}
           </form>
 
-          <div className="space-y-4">
+          <div className="repair-detail-aside space-y-4" data-active-tab={activeTab}>
             <form onSubmit={savePriority} className="panel space-y-3 p-4 sm:p-5"><div><p className="eyebrow">PRIORITY</p><h3 className="mt-1 text-sm font-semibold">E. 急件與指派</h3></div><div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold">急件等級<select value={priority} onChange={(event) => setPriority(event.target.value)} className="mt-1.5 h-10 w-full rounded-md border-[#dfe5de] bg-white text-sm"><option value="normal">一般</option><option value="priority">優先</option><option value="urgent">急件</option></select></label><label className="text-xs font-semibold">指定處理人員<select value={priorityAssignee} onChange={(event) => setPriorityAssignee(event.target.value)} className="mt-1.5 h-10 w-full rounded-md border-[#dfe5de] bg-white text-sm"><option value="">依角色待辦</option>{profiles.map((person) => <option key={person.id} value={person.id}>{person.full_name} · {person.role}</option>)}</select></label><label className="text-xs font-semibold">希望完成時間<input type="datetime-local" value={priorityDueAt} onChange={(event) => setPriorityDueAt(event.target.value)} className="mt-1.5 h-10 w-full rounded-md border-[#dfe5de] text-sm" /></label><label className="text-xs font-semibold">急件原因<input value={priorityReason} onChange={(event) => setPriorityReason(event.target.value)} className="mt-1.5 h-10 w-full rounded-md border-[#dfe5de] text-sm" /></label><ReadOnly label="急件建立人員" value={profiles.find((person) => person.id === job.priority_created_by)?.full_name ?? job.priority_created_by} /><ReadOnly label="急件建立時間" value={formatDateTime(typeof job.priority_created_at === 'string' ? job.priority_created_at : null)} /></div><button disabled={saving} className="h-9 rounded-md border border-[#dce2db] bg-white px-3 text-xs font-semibold disabled:opacity-50">儲存急件設定</button><p className="text-[11px] text-[#78827c]">系統會建立可追蹤的站內待辦，不會假稱已寄送外部訊息。</p></form>
 
             <section className="panel p-4 sm:p-5"><div><p className="eyebrow">QUOTE</p><h3 className="mt-1 text-sm font-semibold">C. 維修報價明細</h3></div>

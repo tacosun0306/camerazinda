@@ -31,6 +31,12 @@ button { cursor: pointer; }
 .data-row { display: grid; align-items: center; border-bottom: 1px solid #edf0eb; }
 .data-row:last-child { border-bottom: 0; }
 .status-pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 9px; font-size: 12px; font-weight: 650; white-space: nowrap; }
+.repair-detail-aside > * { display: none; }
+.repair-detail-aside[data-active-tab='basic'] > form:nth-child(1),
+.repair-detail-aside[data-active-tab='quote'] > section:nth-child(2),
+.repair-detail-aside[data-active-tab='logistics'] > section:nth-child(3),
+.repair-detail-aside[data-active-tab='status'] > form:nth-child(4),
+.repair-detail-aside[data-active-tab='history'] > section:nth-child(5) { display: block; }
 .mobile-overlay { background: rgb(16 26 23 / 48%); }
 [class~="text-[10px]"] { font-size: 12px; }
 [class~="text-[11px]"] { font-size: 13px; }
