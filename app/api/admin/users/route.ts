@@ -24,15 +24,17 @@ export async function GET() {
     if (storesError) throw storesError;
     return NextResponse.json({ users: data ?? [], stores: stores ?? [] });
   } catch (error) {
-    const message = error instanceof Error ? error.message : '';
-    if (error instanceof Error) {
-      const databaseError = error as Error & { code?: string };
-      console.error('[admin/users] GET failed', {
-        name: error.name,
-        code: databaseError.code,
-        message,
-      });
-    }
+    const errorObject = typeof error === 'object' && error !== null
+      ? error as { name?: unknown; code?: unknown; message?: unknown }
+      : undefined;
+    const message = error instanceof Error
+      ? error.message
+      : typeof errorObject?.message === 'string' ? errorObject.message : String(error);
+    console.error('[admin/users] GET failed', {
+      name: error instanceof Error ? error.name : errorObject?.name,
+      code: errorObject?.code,
+      message,
+    });
     const status = message.includes('admin credentials') ? 503 : 500;
     return NextResponse.json({ error: status === 503 ? '尚未設定伺服器端 Supabase Admin 憑證' : '無法載入人員資料' }, { status });
   }
