@@ -20,17 +20,23 @@ export const repairStatuses = [
   { value: 'repair_received', label: '維修部已收件' },
   { value: 'diagnosing', label: '檢測中' },
   { value: 'quoting', label: '報價中' },
+  { value: 'quote_pending_customer', label: '報價待確認' },
+  { value: 'waiting_customer', label: '等待客戶確認' },
   { value: 'repairing', label: '維修中' },
+  { value: 'paused', label: '暫停維修' },
+  { value: 'repair_completed', label: '維修完成待寄回' },
   { value: 'returned_to_store', label: '維修部寄回門市' },
   { value: 'store_received', label: '門市已收件' },
   { value: 'customer_notified', label: '通知客戶' },
   { value: 'picked_up', label: '客戶已取件' },
+  { value: 'repair_cancelled', label: '維修取消／不修' },
+  { value: 'unrepairable', label: '無法維修' },
 ] as const;
 
 export type WorkspaceField = {
   key: string;
   label: string;
-  type: 'text' | 'email' | 'tel' | 'date' | 'number' | 'select';
+  type: 'text' | 'email' | 'tel' | 'date' | 'datetime-local' | 'number' | 'select';
   options?: readonly { value: string; label: string }[];
   optional?: boolean;
 };
@@ -54,15 +60,30 @@ export const moduleContent = {
   },
   repairs: {
     title: '維修案件', description: '掌握送修進度、預計取件與客戶聯繫。', addLabel: '建立維修單',
-    columns: ['案件編號', '客戶', '聯絡電話', '品項', '問題摘要', '預計完成', '狀態'],
+    columns: ['案件編號', '客戶姓名', '聯絡電話', '品牌／品項／型號', '問題摘要', '急件等級', '預計完成', '案件狀態', '待辦提示'],
     fields: [
       { key: 'case_number', label: '案件編號', type: 'text' },
       { key: 'customer_name', label: '客戶姓名', type: 'text' },
       { key: 'customer_phone', label: '聯絡電話', type: 'tel' },
+      { key: 'brand', label: '品牌', type: 'text', optional: true },
       { key: 'item_name', label: '維修品項', type: 'text' },
+      { key: 'model', label: '型號', type: 'text', optional: true },
+      { key: 'serial_number', label: '序號', type: 'text', optional: true },
       { key: 'issue', label: '問題摘要', type: 'text' },
       { key: 'due_at', label: '預計完成', type: 'date', optional: true },
-      { key: 'status', label: '維修狀態', type: 'select', options: repairStatuses },
+      { key: 'accessories', label: '隨附配件', type: 'text', optional: true },
+      { key: 'appearance_condition', label: '外觀狀況', type: 'text', optional: true },
+      { key: 'inspection_person_id', label: '檢測人員', type: 'select', options: [{ value: '', label: '請選擇人員' }], optional: true },
+      { key: 'inspection_at', label: '檢測日期', type: 'datetime-local', optional: true },
+      { key: 'fault_cause', label: '故障原因', type: 'text', optional: true },
+      { key: 'inspection_result', label: '檢測結果', type: 'text', optional: true },
+      { key: 'recommended_repair', label: '建議維修方式', type: 'text', optional: true },
+      { key: 'inspection_notes', label: '檢測備註', type: 'text', optional: true },
+      { key: 'actual_repair_items', label: '實際維修項目', type: 'text', optional: true },
+      { key: 'replacement_parts', label: '更換零件', type: 'text', optional: true },
+      { key: 'repair_result', label: '維修結果', type: 'text', optional: true },
+      { key: 'repaired_at', label: '完修日期', type: 'datetime-local', optional: true },
+      { key: 'repaired_by', label: '維修人員', type: 'select', options: [{ value: '', label: '請選擇人員' }], optional: true },
     ],
   },
   users: {

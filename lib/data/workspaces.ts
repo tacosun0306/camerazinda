@@ -17,6 +17,34 @@ const roleLabels: Record<string, string> = {
 
 const formatDate = (value: string | null) => value ? value.slice(0, 10) : '—';
 const formatTime = (value: string | null) => value ? new Date(value).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false }) : '—';
+export const localDateKey = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
+const repairPriorityLabels: Record<string, string> = { normal: '一般', priority: '優先', urgent: '急件' };
+
+function repairTodo(status: string, dueAt: string | null, priority: string) {
+  if (status === 'picked_up') return '已完成';
+  if (['repair_cancelled', 'unrepairable'].includes(status)) return '已結案';
+  if (dueAt && dueAt < localDateKey()) return '已逾期';
+  if (priority === 'urgent') return '急件待處理';
+  const todoLabels: Record<string, string> = {
+    store_created: '待寄出',
+    store_shipped: '待收件',
+    repair_received: '待檢測',
+    diagnosing: '待提交報價',
+    quoting: '待提交報價',
+    quote_pending_customer: '待客戶確認',
+    waiting_customer: '待客戶確認',
+    repairing: '待維修',
+    paused: '暫停維修',
+    repair_completed: '待寄回',
+    returned_to_store: '待門市收件',
+    store_received: '待通知客戶',
+    customer_notified: '待客戶取件',
+  };
+  return todoLabels[status] ?? '待處理';
+}
 
 function fail(error: { message: string } | null): void {
   if (error) throw new Error(error.message);
@@ -35,11 +63,25 @@ export async function loadWorkspaceRecords(client: SupabaseClient, moduleKey: Wo
   }
 
   if (moduleKey === 'repairs') {
-    const { data, error } = await client.from('repair_jobs').select('id, case_number, customer_name, customer_phone, item_name, issue, due_at, status').order('created_at', { ascending: false });
+    const { data, error } = await client.from('repair_jobs').select('id, case_number, customer_name, customer_phone, brand, item_name, model, serial_number, issue, due_at, status, priority, priority_reason, priority_due_at, priority_assigned_to, priority_created_by, priority_created_at, assigned_to, created_by, created_at, updated_at, store_name, accessories, appearance_condition, inspection_person_id, inspection_at, fault_cause, inspection_result, recommended_repair, inspection_notes, actual_repair_items, replacement_parts, repair_result, repaired_at, repaired_by, store_shipped_at, store_tracking_number, repair_received_at, repair_shipped_back_at, return_tracking_number, store_received_at, customer_notified_at, notification_method, notification_result, picked_up_at, customer_confirmation_status, quote_version').order('created_at', { ascending: false });
     fail(error);
-    return (data ?? []).map((job) => ({
+    return [...(data ?? [])].sort((left, right) => {
+      const priorityDifference = (right.priority === 'urgent' ? 2 : right.priority === 'priority' ? 1 : 0) - (left.priority === 'urgent' ? 2 : left.priority === 'priority' ? 1 : 0);
+      if (priorityDifference) return priorityDifference;
+      return (left.due_at ?? '9999-12-31').localeCompare(right.due_at ?? '9999-12-31');
+    }).map((job) => ({
       id: job.id,
-      cells: [job.case_number, job.customer_name, job.customer_phone, job.item_name, job.issue, formatDate(job.due_at), repairStatuses.find((status) => status.value === job.status)?.label ?? job.status],
+      cells: [
+        job.case_number,
+        job.customer_name,
+        job.customer_phone,
+        [job.brand, job.item_name, job.model].filter(Boolean).join(' / '),
+        job.issue,
+        repairPriorityLabels[job.priority] ?? '一般',
+        formatDate(job.due_at),
+        repairStatuses.find((status) => status.value === job.status)?.label ?? job.status,
+        repairTodo(job.status, job.due_at, job.priority),
+      ],
       editableValue: job.status,
       data: job,
     }));
@@ -129,16 +171,7 @@ export async function createWorkspaceRecord(client: SupabaseClient, moduleKey: W
     return;
   }
   if (moduleKey === 'repairs') {
-    const { error } = await client.from('repair_jobs').insert({
-      case_number: values.case_number,
-      customer_name: values.customer_name,
-      customer_phone: values.customer_phone,
-      item_name: values.item_name,
-      issue: values.issue,
-      due_at: values.due_at || null,
-      status: values.status,
-      created_by: employeeId,
-    });
+    const { error } = await client.rpc('create_repair_job', { p_changes: values });
     fail(error);
     return;
   }
@@ -159,16 +192,7 @@ export async function updateWorkspaceRecord(client: SupabaseClient, moduleKey: W
     return;
   }
   if (moduleKey === 'repairs') {
-    const { error } = await client.rpc('update_repair_job', {
-      p_repair_job_id: recordId,
-      p_case_number: values.case_number,
-      p_customer_name: values.customer_name,
-      p_customer_phone: values.customer_phone,
-      p_item_name: values.item_name,
-      p_issue: values.issue,
-      p_due_at: values.due_at || null,
-      p_status: values.status,
-    });
+    const { error } = await client.rpc('update_repair_job', { p_repair_job_id: recordId, p_changes: values });
     fail(error);
     return;
   }
