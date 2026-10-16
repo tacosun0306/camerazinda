@@ -18,7 +18,7 @@ npm run dev
 
 帳號管理 API 另外需要 server-only 的 `SUPABASE_SERVICE_ROLE_KEY`（或 Supabase 新版 `SUPABASE_SECRET_KEY`），只能設在 Vercel server 環境及 `.env.local`，不可使用 `NEXT_PUBLIC_` 前綴、提交到 Git、送進瀏覽器或記錄在 log。設定 `NEXT_PUBLIC_SITE_URL` 為正式網站 origin，並在 Supabase Auth URL Configuration 加入 `/auth/callback` redirect allowlist。
 
-Supabase Auth 必須啟用 email invitations／password recovery，並設定寄信 SMTP；將 invite 與 recovery OTP 有效期限設為不超過 15 分鐘。帳號只能由 admin API 邀請，管理員不輸入、不讀取使用者密碼。首次設定及重設完成前 profile 保持停用，RLS 與 middleware 都會拒絕存取；停用及待重設會撤銷 Auth refresh sessions。
+Supabase Auth 必須關閉「Allow new users to sign up」，只由管理員透過 Auth Admin 邀請建立帳號；同時啟用 email invitations／password recovery 並設定寄信 SMTP。將 invite 與 recovery OTP 有效期限設為不超過 15 分鐘。管理員不輸入、不讀取使用者密碼；首次設定及重設完成前 profile 保持停用，RLS 與 middleware 都會拒絕存取；停用及待重設會撤銷 Auth refresh sessions。
 
 Production 環境變數請在 Vercel Project Settings 設定公開 URL/key、`NEXT_PUBLIC_SITE_URL` 及 server-only Supabase Admin key。不要提交 `.env.local`、service role/secret key、資料庫密碼或 JWT secret。
 

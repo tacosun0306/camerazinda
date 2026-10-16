@@ -1,5 +1,6 @@
 import { Camera } from 'lucide-react';
 import Link from 'next/link';
+import { AuthRecoveryHashRedirect } from '@/components/auth-recovery-hash-redirect';
 import { signIn } from './actions';
 
 const errors: Record<string, string> = {
@@ -15,6 +16,7 @@ const errors: Record<string, string> = {
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; next?: string }> }) {
   const { error, next } = await searchParams;
   return <main className="grid min-h-screen bg-[#182421] lg:grid-cols-[1.05fr_.95fr]">
+    <AuthRecoveryHashRedirect />
     <section className="relative hidden overflow-hidden p-12 text-white lg:flex lg:flex-col lg:justify-between">
       <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(circle at 78% 30%, #7c9f6c 0, transparent 28%), linear-gradient(135deg, transparent 35%, #31463c 100%)' }} />
       <Link href="/dashboard" className="relative flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-lg bg-lime text-ink"><Camera size={20} /></span><span className="text-sm font-bold tracking-wide">CAMERA STORE OS</span></Link>

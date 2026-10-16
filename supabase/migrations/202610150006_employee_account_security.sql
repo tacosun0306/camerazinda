@@ -101,25 +101,6 @@ as $$
     and account_status = 'active'
 $$;
 
-create or replace function public.reject_uninvited_auth_user()
-returns trigger
-language plpgsql security definer set search_path = public, pg_temp
-as $$
-begin
-  if new.invited_at is null then
-    raise exception 'Self-registration is disabled; ask an administrator for an invitation'
-      using errcode = '42501';
-  end if;
-  return new;
-end;
-$$;
-
-revoke all on function public.reject_uninvited_auth_user() from public, anon, authenticated;
-drop trigger if exists require_admin_invitation on auth.users;
-create trigger require_admin_invitation
-  before insert on auth.users
-  for each row execute function public.reject_uninvited_auth_user();
-
 create or replace function public.sync_auth_user_profile()
 returns trigger
 language plpgsql security definer set search_path = public
